@@ -1,17 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
+import 'features/login/presentation/page/login_page.dart';
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  const supabaseUrl = String.fromEnvironment('SUPABASE_URL');
-  const supabaseKey = String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY');
-
-  if (supabaseUrl.isEmpty || supabaseKey.isEmpty) {
-    throw StateError('Missing Supabase configuration.');
-  }
-
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+  await Supabase.initialize(
+    url: const String.fromEnvironment('SUPABASE_URL'),
+    publishableKey: const String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY'),
+    
+  );
 
   runApp(const InvoFlowApp());
 }
@@ -21,11 +20,9 @@ class InvoFlowApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'InvoFlow',
+    return const MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, brightness: Brightness.light),
-      home: const Scaffold(body: Center(child: Text('InvoFlow'))),
+      home: Scaffold(body: Center(child: LoginPage())),
     );
   }
 }
