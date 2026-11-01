@@ -1,26 +1,28 @@
 import 'package:flutter/material.dart';
 
 class AppTextfield extends StatelessWidget {
-  String hintText;
-  Icon? leftIcon;
-  Icon? rightIcon;
-  Function()? onChangedRightIcon;
-  bool obscureText;
+  final String hintText;
+  final Icon? leftIcon;
+  final Icon? rightIcon;
+  final Function()? onChangedRightIcon;
+  final bool obscureText;
+  final TextEditingController? controller;
 
-  AppTextfield({
+  const AppTextfield({
     super.key,
     required this.hintText,
     this.leftIcon,
     this.rightIcon,
     this.onChangedRightIcon,
     this.obscureText = false,
+    this.controller,
   });
 
   @override
   Widget build(BuildContext context) {
     return TextField(
+      controller: controller,
       obscureText: obscureText,
-
       decoration: InputDecoration(
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(20)),
         labelText: hintText,
