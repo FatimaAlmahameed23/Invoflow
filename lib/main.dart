@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'mobile_ui.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 Future<void> main() async {
@@ -11,7 +12,7 @@ Future<void> main() async {
     throw StateError('Missing Supabase configuration.');
   }
 
-  await Supabase.initialize(url: supabaseUrl, anonKey: supabaseKey);
+  await Supabase.initialize(url: supabaseUrl, publishableKey: supabaseKey);
 
   runApp(const InvoFlowApp());
 }
@@ -21,11 +22,6 @@ class InvoFlowApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'InvoFlow',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(useMaterial3: true, brightness: Brightness.light),
-      home: const Scaffold(body: Center(child: Text('InvoFlow'))),
-    );
+    return const InvoFlowPreview();
   }
 }
