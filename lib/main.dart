@@ -1,3 +1,4 @@
+import 'core/di/app_dependencies.dart';
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -9,10 +10,9 @@ Future<void> main() async {
   await Supabase.initialize(
     url: const String.fromEnvironment('SUPABASE_URL'),
     publishableKey: const String.fromEnvironment('SUPABASE_PUBLISHABLE_KEY'),
-    
   );
 
-  runApp(const InvoFlowApp());
+  runApp(const AppDependencies(child: InvoFlowApp()));
 }
 
 class InvoFlowApp extends StatelessWidget {
@@ -20,9 +20,15 @@ class InvoFlowApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
+    return MaterialApp(
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(
+          seedColor: const Color(0xFF92257E),
+          primary: const Color(0xFF92257E),
+        ),
+      ),
       debugShowCheckedModeBanner: false,
-      home: Scaffold(body: Center(child: LoginPage())),
+      home: const LoginPage(),
     );
   }
 }

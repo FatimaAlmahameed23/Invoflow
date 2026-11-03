@@ -1,4 +1,3 @@
--- Final live InvoFlow export. Fresh-project migration; do not run on the existing project.
 BEGIN;
 SET LOCAL search_path = public, pg_catalog;
 CREATE SEQUENCE public."invoice_number_seq" AS bigint INCREMENT BY 1 MINVALUE 1 NO MAXVALUE START WITH 1 CACHE 1 NO CYCLE;

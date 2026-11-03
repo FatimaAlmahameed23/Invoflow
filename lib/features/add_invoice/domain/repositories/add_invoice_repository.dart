@@ -1,0 +1,11 @@
+import 'package:invoflow/features/add_invoice/domain/entities/product.dart';
+import 'package:invoflow/features/invoice/domain/entities/invoice.dart';
+
+abstract class AddInvoiceRepository {
+  Future<List<Product>> getProducts({required String currency});
+  Future<Invoice> createInvoice({
+    required String currency,
+    required List<Map<String, dynamic>> items,
+    required String idempotencyKey,
+  });
+}

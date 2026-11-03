@@ -1,7 +1,6 @@
--- Final live InvoFlow export. Fresh-project migration; do not run on the existing project.
 BEGIN;
 SET LOCAL search_path = public, pg_catalog;
--- Product UUIDs and creation times are generated in the new project.
+
 INSERT INTO public.products(name,barcode,price_jod,tax_rate,tax_inclusive,is_active) VALUES
 ('Laptop','10000001',500,16,false,true),
 ('Mouse','10000002',15,16,true,true),
