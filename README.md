@@ -52,13 +52,7 @@ Screenshots of the five application screens are available in:
 
 Screens included: Login, Invoice List, Create Invoice, Invoice Details, and Settings.
 
-## 5. REST API Source Code
-
-REST APIs are implemented using Supabase Edge Functions.
-
-- **Source code:** [`supabase/functions/`](supabase/functions/)
-
-## 6. APK
+## 5. APK
 
 The APK is provided separately with the submission.
 
