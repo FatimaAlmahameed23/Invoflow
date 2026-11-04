@@ -1,5 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
+import 'package:invoflow/features/invoice/data/models/response/invoice_model.dart';
 import 'package:invoflow/features/invoice/domain/services/invoice_tax_calculator.dart';
 
 void main() {

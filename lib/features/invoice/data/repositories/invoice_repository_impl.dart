@@ -1,20 +1,13 @@
 import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
-import 'package:invoflow/core/network/api_exception.dart';
 import 'package:invoflow/features/invoice/data/datasources/invoice_remote_data_source.dart';
 import 'package:invoflow/features/invoice/domain/entities/invoice.dart';
-import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
+import 'package:invoflow/features/invoice/data/models/response/invoice_model.dart';
 import 'package:invoflow/features/invoice/domain/repositories/invoice_repository.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InvoiceRepositoryImpl implements InvoiceRepository {
-  const InvoiceRepositoryImpl({
-    required InvoiceRemoteDataSource remoteDataSource,
-    required SupabaseClient supabaseClient,
-  }) : _remoteDataSource = remoteDataSource,
-       _supabaseClient = supabaseClient;
+  const InvoiceRepositoryImpl(this._remoteDataSource);
 
   final InvoiceRemoteDataSource _remoteDataSource;
-  final SupabaseClient _supabaseClient;
 
   @override
   Future<List<Invoice>> getInvoices() async {
@@ -27,19 +20,9 @@ class InvoiceRepositoryImpl implements InvoiceRepository {
     required String invoiceId,
     required String idempotencyKey,
   }) async {
-    final accessToken = _supabaseClient.auth.currentSession?.accessToken;
-    if (accessToken == null || accessToken.isEmpty) {
-      throw const ApiException(
-        statusCode: 401,
-        code: 'SESSION_EXPIRED',
-        message: 'Your session has expired. Please sign in again.',
-      );
-    }
-
     final response = await _remoteDataSource.deleteInvoice(
       invoiceId: invoiceId,
       idempotencyKey: idempotencyKey,
-      accessToken: accessToken,
     );
     final invoice = _toInvoice(response);
     if (invoice.status != InvoiceStatus.deleted) {

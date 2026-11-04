@@ -27,13 +27,17 @@ class SettingsCubit extends Cubit<SettingsState> {
   }
 
   Future<void> signOut() async {
+    if (isClosed || state.isSigningOut || state.isSignedOut) return;
     emit(SettingsState(user: state.user, isSigningOut: true));
     try {
       await signOutUseCase();
+      if (isClosed) return;
       emit(const SettingsState(isSignedOut: true));
     } on AuthException catch (error) {
+      if (isClosed) return;
       emit(SettingsState(user: state.user, errorMessage: error.message));
     } catch (_) {
+      if (isClosed) return;
       emit(
         SettingsState(
           user: state.user,

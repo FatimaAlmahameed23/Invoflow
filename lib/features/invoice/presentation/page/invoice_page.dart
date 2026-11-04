@@ -1,3 +1,4 @@
+import 'package:invoflow/core/di/add_invoice_dependencies.dart';
 import 'package:invoflow/core/di/invoice_dependencies.dart';
 import 'package:invoflow/core/widgets/app_app_bar.dart';
 import 'package:flutter/material.dart';

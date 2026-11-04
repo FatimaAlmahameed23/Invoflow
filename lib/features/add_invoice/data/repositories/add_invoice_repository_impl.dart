@@ -1,3 +1,5 @@
+import '../models/request/create_invoice_request_model.dart';
+import 'package:invoflow/features/add_invoice/domain/entities/invoice_item.dart';
 import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
 import 'package:invoflow/features/add_invoice/data/datasources/add_invoice_remote_data_source.dart';
 import 'package:invoflow/features/add_invoice/domain/entities/product.dart';
@@ -8,17 +10,40 @@ class AddInvoiceRepositoryImpl implements AddInvoiceRepository {
   const AddInvoiceRepositoryImpl(this._dataSource);
   final AddInvoiceRemoteDataSource _dataSource;
   @override
-  Future<List<Product>> getProducts({required String currency}) =>
-      _dataSource.getProducts(currency: currency);
+  Future<List<Product>> getProducts({required String currency}) async {
+    final response = await _dataSource.getProducts(currency: currency);
+    return response
+        .map(
+          (product) => Product(
+            id: product.id,
+            name: product.name,
+            barcode: product.barcode,
+            unitPrice: product.unitPrice.toDouble(),
+            taxRate: product.taxRate.toDouble(),
+            taxInclusive: product.taxInclusive,
+          ),
+        )
+        .toList(growable: false);
+  }
+
   @override
   Future<Invoice> createInvoice({
     required String currency,
-    required List<Map<String, dynamic>> items,
+    required List<InvoiceItem> items,
     required String idempotencyKey,
   }) async {
     final response = await _dataSource.createInvoice(
-      currency: currency,
-      items: items,
+      request: CreateInvoiceRequestModel(
+        currency: currency,
+        items: items
+            .map(
+              (item) => CreateInvoiceItemRequestModel(
+                productId: item.productId,
+                quantity: item.quantity,
+              ),
+            )
+            .toList(growable: false),
+      ),
       idempotencyKey: idempotencyKey,
     );
     final status = InvoiceStatus.fromApi(response.status);

@@ -1,3 +1,4 @@
+import 'package:invoflow/features/add_invoice/domain/entities/invoice_item.dart';
 import 'dart:convert';
 import 'dart:math';
 
@@ -129,7 +130,7 @@ class AddInvoiceCubit extends Cubit<AddInvoiceState> {
 
   Future<void> saveInvoice() async {
     if (state.isSaving || state.isLoadingProducts || state.isCreated) return;
-    final items = <Map<String, dynamic>>[];
+    final items = <InvoiceItem>[];
     for (final product in state.products) {
       final value = state.quantities[product.id]?.trim() ?? '';
       if (value.isEmpty) continue;
@@ -146,13 +147,16 @@ class AddInvoiceCubit extends Cubit<AddInvoiceState> {
         );
         return;
       }
-      items.add({'product_id': product.id, 'quantity': quantity});
+      items.add(InvoiceItem(productId: product.id, quantity: quantity));
     }
     if (items.isEmpty) {
       emit(state.copyWith(message: 'Add at least one item to the invoice.'));
       return;
     }
-    final signature = jsonEncode({'currency': state.currency, 'items': items});
+    final signature = jsonEncode({
+      'currency': state.currency,
+      'items': items.map((item) => [item.productId, item.quantity]).toList(),
+    });
     if (_pendingSignature != signature || _pendingKey == null) {
       _pendingSignature = signature;
       final random = Random.secure();

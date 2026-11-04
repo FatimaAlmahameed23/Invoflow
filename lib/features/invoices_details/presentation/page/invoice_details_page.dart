@@ -1,15 +1,11 @@
+import 'package:invoflow/core/di/invoice_details_dependencies.dart';
 import 'package:invoflow/core/widgets/app_app_bar.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:invoflow/core/network/api_client.dart';
-import 'package:invoflow/features/invoices_details/data/datasources/invoice_details_remote_data_source.dart';
-import 'package:invoflow/features/invoices_details/data/repositories/invoice_details_repository_impl.dart';
-import 'package:invoflow/features/invoices_details/domain/usecases/get_invoice_details_use_case.dart';
 import 'package:invoflow/features/invoices_details/presentation/cubit/invoice_details_cubit.dart';
 import 'package:invoflow/features/invoices_details/presentation/widgets/invoice_details_information.dart';
 import 'package:invoflow/features/invoices_details/presentation/widgets/invoice_details_items.dart';
 import 'package:invoflow/features/invoices_details/presentation/widgets/invoice_details_totals.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 
 class InvoiceDetailsPage extends StatelessWidget {
   const InvoiceDetailsPage({super.key, required this.invoiceId});
@@ -18,15 +14,8 @@ class InvoiceDetailsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final apiClient = ApiClient(Supabase.instance.client);
-    final repository = InvoiceDetailsRepositoryImpl(
-      InvoiceDetailsRemoteDataSource(apiClient),
-    );
-
-    return BlocProvider(
-      create: (_) =>
-          InvoiceDetailsCubit(GetInvoiceDetailsUseCase(repository))
-            ..loadInvoice(invoiceId),
+    return InvoiceDetailsDependencies(
+      invoiceId: invoiceId,
       child: _InvoiceDetailsView(invoiceId: invoiceId),
     );
   }

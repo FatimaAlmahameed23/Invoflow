@@ -1,5 +1,5 @@
 import 'package:invoflow/core/network/api_client.dart';
-import 'package:invoflow/features/invoices_details/data/models/invoice_details_model.dart';
+import 'package:invoflow/features/invoices_details/data/models/response/invoice_details_model.dart';
 
 class InvoiceDetailsRemoteDataSource {
   const InvoiceDetailsRemoteDataSource(this._apiClient);

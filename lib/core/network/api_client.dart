@@ -62,6 +62,18 @@ class ApiClient {
 
   ApiClient(this._supabase);
 
+  String requireAccessToken() {
+    final accessToken = _supabase.auth.currentSession?.accessToken;
+    if (accessToken == null || accessToken.isEmpty) {
+      throw const ApiException(
+        statusCode: 401,
+        code: 'SESSION_EXPIRED',
+        message: 'Your session has expired. Please sign in again.',
+      );
+    }
+    return accessToken;
+  }
+
   Future<dynamic> get(
     String endpoint, {
     Map<String, dynamic>? queryParameters,

@@ -1,5 +1,5 @@
 import 'package:invoflow/core/network/api_client.dart';
-import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
+import 'package:invoflow/features/invoice/data/models/response/invoice_model.dart';
 
 class InvoiceRemoteDataSource {
   const InvoiceRemoteDataSource(this._apiClient);
@@ -18,8 +18,8 @@ class InvoiceRemoteDataSource {
   Future<InvoiceModel> deleteInvoice({
     required String invoiceId,
     required String idempotencyKey,
-    required String accessToken,
   }) async {
+    final accessToken = _apiClient.requireAccessToken();
     final response = await _apiClient.delete(
       'invoices/$invoiceId',
       headers: {

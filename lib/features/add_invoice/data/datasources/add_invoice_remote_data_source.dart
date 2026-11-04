@@ -1,6 +1,7 @@
+import '../models/request/create_invoice_request_model.dart';
 import 'package:invoflow/core/network/api_client.dart';
-import 'package:invoflow/features/add_invoice/data/models/product_model.dart';
-import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
+import 'package:invoflow/features/add_invoice/data/models/response/product_model.dart';
+import 'package:invoflow/features/invoice/data/models/response/invoice_model.dart';
 
 class AddInvoiceRemoteDataSource {
   const AddInvoiceRemoteDataSource(this._apiClient);
@@ -16,13 +17,12 @@ class AddInvoiceRemoteDataSource {
   }
 
   Future<InvoiceModel> createInvoice({
-    required String currency,
-    required List<Map<String, dynamic>> items,
+    required CreateInvoiceRequestModel request,
     required String idempotencyKey,
   }) async {
     final response = await _apiClient.post(
       'invoices',
-      body: {'currency': currency, 'items': items},
+      body: request.toJson(),
       headers: {'Idempotency-Key': idempotencyKey},
     );
 

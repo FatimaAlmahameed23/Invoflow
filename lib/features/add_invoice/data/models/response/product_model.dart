@@ -1,14 +1,19 @@
-import 'package:invoflow/features/add_invoice/domain/entities/product.dart';
-
-class ProductModel extends Product {
+class ProductModel {
   const ProductModel({
-    required super.id,
-    required super.name,
-    required super.barcode,
-    required super.unitPrice,
-    required super.taxRate,
-    required super.taxInclusive,
+    required this.id,
+    required this.name,
+    required this.barcode,
+    required this.unitPrice,
+    required this.taxRate,
+    required this.taxInclusive,
   });
+
+  final String id;
+  final String name;
+  final String? barcode;
+  final num unitPrice;
+  final num taxRate;
+  final bool taxInclusive;
 
   factory ProductModel.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
@@ -31,8 +36,8 @@ class ProductModel extends Product {
       id: id,
       name: name,
       barcode: barcode as String?,
-      unitPrice: unitPrice.toDouble(),
-      taxRate: taxRate.toDouble(),
+      unitPrice: unitPrice,
+      taxRate: taxRate,
       taxInclusive: taxInclusive,
     );
   }

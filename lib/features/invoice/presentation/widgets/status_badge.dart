@@ -6,18 +6,23 @@ class StatusBadge extends StatelessWidget {
 
   final InvoiceStatus status;
 
+  Color get _color => switch (status) {
+    InvoiceStatus.approved => const Color(0xFF167A38),
+    InvoiceStatus.deleted => const Color(0xFFC62828),
+  };
+
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: status.color.withValues(alpha: 0.14),
+        color: _color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
         status.displayName,
         style: TextStyle(
-          color: status.color,
+          color: _color,
           fontSize: 12,
           fontWeight: FontWeight.w600,
         ),
