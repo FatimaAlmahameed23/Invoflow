@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
-import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
-import 'package:invoflow/features/invoices_details/data/models/invoice_details_model.dart';
+import 'package:invoflow/features/invoices_details/data/models/response/invoice_details_model.dart';
 
 void main() {
   test(
@@ -41,12 +40,12 @@ void main() {
       });
 
       expect(invoice.id, 'invoice-uuid');
-      expect(invoice.status, InvoiceStatus.deleted);
-      expect(invoice.customerName, 'Smart Solutions');
-      expect(invoice.taxMode, 'Exclusive');
-      expect(invoice.taxRateLabel, 'Tax (15%)');
+      expect(invoice.status, 'deleted');
+      expect(invoice.clientName, 'Smart Solutions');
+      expect(invoice.customerName, isNull);
+      expect(invoice.createdAt, '2025-01-28T12:00:00Z');
       expect(invoice.items, hasLength(2));
-      expect(invoice.items.first.total, 805);
+      expect(invoice.items.first.lineTotal, 805);
       expect(invoice.grandTotal, 977.5);
     },
   );

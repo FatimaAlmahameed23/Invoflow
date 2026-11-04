@@ -11,18 +11,20 @@ class AuthCubit extends Cubit<AuthState> {
   AuthCubit(this.loginUseCase) : super(AuthInitial());
 
   Future<void> login({required String email, required String password}) async {
+    if (isClosed || state is AuthLoading) return;
     emit(AuthLoading());
 
     try {
       final user = await loginUseCase(email: email.trim(), password: password);
 
+      if (isClosed) return;
       emit(AuthSuccess(user));
     } on AuthException catch (e) {
+      if (isClosed) return;
       emit(AuthFailure(e.message));
     } catch (_) {
+      if (isClosed) return;
       emit(AuthFailure('Something went wrong. Please try again.'));
     }
   }
 }
-
-

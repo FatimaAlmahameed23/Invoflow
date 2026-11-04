@@ -1,3 +1,4 @@
+import 'package:invoflow/features/add_invoice/domain/entities/invoice_item.dart';
 import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:invoflow/features/add_invoice/domain/entities/product.dart';
@@ -98,7 +99,7 @@ class FakeRepository implements AddInvoiceRepository {
   @override
   Future<Invoice> createInvoice({
     required String currency,
-    required List<Map<String, dynamic>> items,
+    required List<InvoiceItem> items,
     required String idempotencyKey,
   }) async {
     keys.add(idempotencyKey);

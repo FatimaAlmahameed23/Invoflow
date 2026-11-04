@@ -9,7 +9,7 @@ class SettingsRepositoryImpl implements SettingsRepository {
 
   @override
   SettingsUser? getCurrentUser() {
-    final user = remoteDataSource.currentUser;
+    final user = remoteDataSource.getCurrentUser();
     final email = user?.email;
     if (email == null || email.isEmpty) return null;
 

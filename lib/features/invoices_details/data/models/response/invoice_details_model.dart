@@ -1,19 +1,31 @@
-import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
-import 'package:invoflow/features/invoices_details/domain/entities/invoice_details.dart';
-
-class InvoiceDetailsModel extends InvoiceDetails {
+class InvoiceDetailsModel {
   const InvoiceDetailsModel({
-    required super.id,
-    required super.invoiceNumber,
-    required super.status,
-    required super.currency,
-    required super.subtotal,
-    required super.taxTotal,
-    required super.grandTotal,
-    required super.createdAt,
-    required super.customerName,
-    required super.items,
+    required this.id,
+    required this.invoiceNumber,
+    required this.status,
+    required this.currency,
+    required this.subtotal,
+    required this.taxTotal,
+    required this.grandTotal,
+    required this.createdAt,
+    required this.customerName,
+    this.clientName,
+    this.customer,
+    required this.items,
   });
+
+  final String id;
+  final String? invoiceNumber;
+  final String status;
+  final String currency;
+  final num subtotal;
+  final num taxTotal;
+  final num grandTotal;
+  final String? createdAt;
+  final String? customerName;
+  final String? clientName;
+  final String? customer;
+  final List<InvoiceDetailsItemModel> items;
 
   factory InvoiceDetailsModel.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
@@ -24,8 +36,9 @@ class InvoiceDetailsModel extends InvoiceDetails {
     final taxTotal = json['tax_total'];
     final grandTotal = json['grand_total'];
     final createdAt = json['created_at'];
-    final customerName =
-        json['customer_name'] ?? json['client_name'] ?? json['customer'];
+    final customerName = json['customer_name'];
+    final clientName = json['client_name'];
+    final customer = json['customer'];
     final rawItems = json['items'];
 
     if (id is! String ||
@@ -37,29 +50,33 @@ class InvoiceDetailsModel extends InvoiceDetails {
         (invoiceNumber != null && invoiceNumber is! String) ||
         (createdAt != null && createdAt is! String) ||
         (customerName != null && customerName is! String) ||
+        (clientName != null && clientName is! String) ||
+        (customer != null && customer is! String) ||
         (rawItems != null && rawItems is! List)) {
       throw const FormatException('The API returned invalid invoice details.');
     }
 
     final items = rawItems == null
-        ? const <InvoiceDetailsItem>[]
+        ? const <InvoiceDetailsItemModel>[]
         : (rawItems as List).map(_parseItem).toList(growable: false);
 
     return InvoiceDetailsModel(
       id: id,
       invoiceNumber: invoiceNumber as String?,
-      status: InvoiceStatus.fromApi(status),
+      status: status,
       currency: currency,
-      subtotal: subtotal.toDouble(),
-      taxTotal: taxTotal.toDouble(),
-      grandTotal: grandTotal.toDouble(),
-      createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
+      subtotal: subtotal,
+      taxTotal: taxTotal,
+      grandTotal: grandTotal,
+      createdAt: createdAt as String?,
       customerName: customerName as String?,
+      clientName: clientName as String?,
+      customer: customer as String?,
       items: items,
     );
   }
 
-  static InvoiceDetailsItem _parseItem(dynamic value) {
+  static InvoiceDetailsItemModel _parseItem(dynamic value) {
     if (value is! Map) {
       throw const FormatException('The API returned an invalid invoice item.');
     }
@@ -84,15 +101,37 @@ class InvoiceDetailsModel extends InvoiceDetails {
       throw const FormatException('The API returned an invalid invoice item.');
     }
 
-    return InvoiceDetailsItem(
-      name: name,
-      quantity: quantity.toDouble(),
-      unitPrice: unitPrice.toDouble(),
-      taxRate: taxRate.toDouble(),
+    return InvoiceDetailsItemModel(
+      productName: name,
+      quantity: quantity,
+      unitPrice: unitPrice,
+      taxRate: taxRate,
       taxInclusive: taxInclusive,
-      subtotal: subtotal.toDouble(),
-      taxAmount: taxAmount.toDouble(),
-      total: total.toDouble(),
+      subtotal: subtotal,
+      taxAmount: taxAmount,
+      lineTotal: total,
     );
   }
+}
+
+class InvoiceDetailsItemModel {
+  const InvoiceDetailsItemModel({
+    required this.productName,
+    required this.quantity,
+    required this.unitPrice,
+    required this.taxRate,
+    required this.taxInclusive,
+    required this.subtotal,
+    required this.taxAmount,
+    required this.lineTotal,
+  });
+
+  final String productName;
+  final num quantity;
+  final num unitPrice;
+  final num taxRate;
+  final bool taxInclusive;
+  final num subtotal;
+  final num taxAmount;
+  final num lineTotal;
 }

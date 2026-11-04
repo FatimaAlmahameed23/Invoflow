@@ -1,14 +1,11 @@
-import 'package:flutter/material.dart';
-
 enum InvoiceStatus {
-  approved('approved', 'Approved', Color(0xFF167A38)),
-  deleted('deleted', 'Deleted', Color(0xFFC62828));
+  approved('approved', 'Approved'),
+  deleted('deleted', 'Deleted');
 
   final String apiValue;
   final String displayName;
-  final Color color;
 
-  const InvoiceStatus(this.apiValue, this.displayName, this.color);
+  const InvoiceStatus(this.apiValue, this.displayName);
 
   static InvoiceStatus fromApi(String value) {
     return InvoiceStatus.values.firstWhere(

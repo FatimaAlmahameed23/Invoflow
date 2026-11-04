@@ -1,12 +1,6 @@
-import 'package:invoflow/features/add_invoice/presentation/cubit/add_invoice_cubit.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:invoflow/core/network/api_client.dart';
-import 'package:invoflow/features/add_invoice/data/datasources/add_invoice_remote_data_source.dart';
-import 'package:invoflow/features/add_invoice/data/repositories/add_invoice_repository_impl.dart';
-import 'package:invoflow/features/add_invoice/domain/usecases/create_invoice_use_case.dart';
-import 'package:invoflow/features/add_invoice/domain/usecases/get_products_use_case.dart';
-import 'package:invoflow/features/add_invoice/presentation/page/add_invoice_page.dart';
 import 'package:invoflow/features/invoice/data/datasources/invoice_remote_data_source.dart';
 import 'package:invoflow/features/invoice/data/repositories/invoice_repository_impl.dart';
 import 'package:invoflow/features/invoice/domain/usecases/delete_invoice_use_case.dart';
@@ -26,8 +20,7 @@ class InvoiceDependencies extends StatelessWidget {
       create: (_) {
         final supabase = Supabase.instance.client;
         final repository = InvoiceRepositoryImpl(
-          remoteDataSource: InvoiceRemoteDataSource(ApiClient(supabase)),
-          supabaseClient: supabase,
+          InvoiceRemoteDataSource(ApiClient(supabase)),
         );
         return InvoiceCubit(
           getInvoices: GetInvoicesUseCase(repository),
@@ -37,22 +30,4 @@ class InvoiceDependencies extends StatelessWidget {
       child: child,
     );
   }
-}
-
-/// Composes the add-invoice route outside the invoice presentation layer.
-Route<bool> createAddInvoiceRoute() {
-  return MaterialPageRoute<bool>(
-    builder: (_) {
-      final repository = AddInvoiceRepositoryImpl(
-        AddInvoiceRemoteDataSource(ApiClient(Supabase.instance.client)),
-      );
-      return BlocProvider<AddInvoiceCubit>(
-        create: (_) => AddInvoiceCubit(
-          getProducts: GetProductsUseCase(repository),
-          createInvoice: CreateInvoiceUseCase(repository),
-        )..loadProducts(),
-        child: const AddInvoicePage(),
-      );
-    },
-  );
 }
