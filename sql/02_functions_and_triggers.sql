@@ -1,4 +1,3 @@
--- Final live InvoFlow export. Fresh-project migration; do not run on the existing project.
 BEGIN;
 SET LOCAL search_path = public, pg_catalog;
 CREATE OR REPLACE FUNCTION public.set_updated_at()
