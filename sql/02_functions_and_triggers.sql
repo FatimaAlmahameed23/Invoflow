@@ -47,80 +47,17 @@ BEGIN
 END;
 $function$;
 
-CREATE OR REPLACE FUNCTION public.recalculate_invoice_totals(p_invoice_id uuid)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
-DECLARE
- v_status TEXT;
-BEGIN
- SELECT status
- INTO v_status
- FROM public.invoices
- WHERE id = p_invoice_id
- FOR UPDATE;
-
- IF NOT FOUND THEN
- RAISE EXCEPTION 'Invoice not found';
- END IF;
-
- IF v_status <> 'draft' THEN
- RAISE EXCEPTION
- 'Only draft invoices can be recalculated';
- END IF;
-
- UPDATE public.invoices
- SET
- subtotal = totals.subtotal,
- tax_total = totals.tax_total,
- grand_total = totals.grand_total
- FROM (
- SELECT
- COALESCE(SUM(subtotal), 0) AS subtotal,
- COALESCE(SUM(tax_amount), 0) AS tax_total,
- COALESCE(SUM(line_total), 0) AS grand_total
- FROM public.invoice_items
- WHERE invoice_id = p_invoice_id
- ) AS totals
- WHERE id = p_invoice_id;
-END;
-$function$;
-
-CREATE OR REPLACE FUNCTION public.replace_draft_items(p_invoice_id uuid, p_items jsonb)
- RETURNS void
- LANGUAGE plpgsql
- SET search_path TO ''
-AS $function$
-DECLARE i public.invoices%ROWTYPE; x jsonb; p public.products%ROWTYPE; q numeric; price numeric; c record; seen uuid[] := '{}'; pid uuid;
-BEGIN
- SELECT * INTO i FROM public.invoices WHERE id=p_invoice_id FOR UPDATE;
- IF NOT FOUND OR i.status <> 'draft' THEN RAISE EXCEPTION 'Draft invoice required'; END IF;
- IF p_items IS NULL OR jsonb_typeof(p_items) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'Items must be an array'; END IF;
- IF jsonb_array_length(p_items) NOT BETWEEN 1 AND 500 THEN RAISE EXCEPTION 'Provide 1 to 500 items'; END IF;
- DELETE FROM public.invoice_items WHERE invoice_id=p_invoice_id;
- FOR x IN SELECT value FROM jsonb_array_elements(p_items) LOOP
- IF jsonb_typeof(x) IS DISTINCT FROM 'object' OR (x-'product_id'-'quantity') <> '{}'::jsonb OR jsonb_typeof(x->'product_id') IS DISTINCT FROM 'string' OR jsonb_typeof(x->'quantity') IS DISTINCT FROM 'number' THEN RAISE EXCEPTION 'Invalid item format'; END IF;
- pid := (x->>'product_id')::uuid; q := (x->>'quantity')::numeric;
- IF q<=0 OR q>999999 OR scale(q)>3 THEN RAISE EXCEPTION 'Invalid quantity'; END IF;
- IF pid=ANY(seen) THEN RAISE EXCEPTION 'Duplicate product'; END IF;
- seen := array_append(seen,pid);
- SELECT * INTO p FROM public.products WHERE id=pid AND is_active FOR SHARE;
- IF NOT FOUND THEN RAISE EXCEPTION 'Product not found or inactive'; END IF;
- price := round(p.price_jod*i.exchange_rate,3);
- SELECT * INTO c FROM public.calculate_invoice_item(q,price,p.tax_rate,p.tax_inclusive);
- INSERT INTO public.invoice_items(invoice_id,product_id,product_name,quantity,unit_price,tax_rate,tax_inclusive,subtotal,tax_amount,line_total) VALUES(i.id,p.id,p.name,q,price,p.tax_rate,p.tax_inclusive,c.subtotal,c.tax_amount,c.line_total);
- END LOOP;
- PERFORM public.recalculate_invoice_totals(i.id);
-END $function$;
-
-CREATE OR REPLACE FUNCTION public.create_draft_invoice(p_currency character varying, p_items jsonb)
+CREATE OR REPLACE FUNCTION public.create_invoice(p_currency character varying, p_items jsonb)
  RETURNS uuid
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO ''
 AS $function$
-DECLARE uid uuid:=auth.uid(); rate numeric; iid uuid;
+DECLARE
+ uid uuid := auth.uid(); rate numeric; iid uuid; x jsonb;
+ p public.products%ROWTYPE; q numeric; price numeric; c record;
+ seen uuid[] := '{}'; pid uuid; snapshots jsonb := '[]'::jsonb;
+ subtotal_sum numeric := 0; tax_sum numeric := 0; total_sum numeric := 0;
 BEGIN
  IF uid IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
  IF p_currency IS NULL OR p_currency NOT IN ('JOD','USD','EUR') THEN RAISE EXCEPTION 'Unsupported currency'; END IF;
@@ -128,44 +65,36 @@ BEGIN
  SELECT CASE p_currency WHEN 'USD' THEN usd_per_jod ELSE eur_per_jod END INTO rate FROM public.user_settings WHERE user_id=uid;
  END IF;
  IF rate IS NULL OR rate<=0 OR rate>=1000000 THEN RAISE EXCEPTION 'Configure a valid rate for the selected currency'; END IF;
- INSERT INTO public.invoices(user_id,currency,exchange_rate) VALUES(uid,p_currency,rate) RETURNING id INTO iid;
- PERFORM public.replace_draft_items(iid,p_items);
+ IF p_items IS NULL OR jsonb_typeof(p_items) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'Items must be an array'; END IF;
+ IF jsonb_array_length(p_items) NOT BETWEEN 1 AND 500 THEN RAISE EXCEPTION 'Provide 1 to 500 items'; END IF;
+
+ -- Validate and price every item before inserting the approved invoice.
+ FOR x IN SELECT value FROM jsonb_array_elements(p_items) LOOP
+  IF jsonb_typeof(x) IS DISTINCT FROM 'object' OR (x-'product_id'-'quantity') <> '{}'::jsonb OR jsonb_typeof(x->'product_id') IS DISTINCT FROM 'string' OR jsonb_typeof(x->'quantity') IS DISTINCT FROM 'number' THEN RAISE EXCEPTION 'Invalid item format'; END IF;
+  pid := (x->>'product_id')::uuid; q := (x->>'quantity')::numeric;
+  IF q<=0 OR q>999999 OR scale(q)>3 THEN RAISE EXCEPTION 'Invalid quantity'; END IF;
+  IF pid=ANY(seen) THEN RAISE EXCEPTION 'Duplicate product'; END IF;
+  seen := array_append(seen,pid);
+  SELECT * INTO p FROM public.products WHERE id=pid AND is_active FOR SHARE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'Product not found or inactive'; END IF;
+  price := round(p.price_jod*rate,3);
+  SELECT * INTO c FROM public.calculate_invoice_item(q,price,p.tax_rate,p.tax_inclusive);
+  snapshots := snapshots || jsonb_build_array(jsonb_build_object(
+   'product_id',p.id,'product_name',p.name,'quantity',q,'unit_price',price,
+   'tax_rate',p.tax_rate,'tax_inclusive',p.tax_inclusive,
+   'subtotal',c.subtotal,'tax_amount',c.tax_amount,'line_total',c.line_total));
+  subtotal_sum := subtotal_sum+c.subtotal;
+  tax_sum := tax_sum+c.tax_amount;
+  total_sum := total_sum+c.line_total;
+ END LOOP;
+
+ INSERT INTO public.invoices(user_id,currency,exchange_rate,status,invoice_number,approved_at,subtotal,tax_total,grand_total)
+ VALUES(uid,p_currency,rate,'approved','INV-' || nextval('public.invoice_number_seq'::regclass)::text,clock_timestamp(),subtotal_sum,tax_sum,total_sum)
+ RETURNING id INTO iid;
+ INSERT INTO public.invoice_items(invoice_id,product_id,product_name,quantity,unit_price,tax_rate,tax_inclusive,subtotal,tax_amount,line_total)
+ SELECT iid,t.product_id,t.product_name,t.quantity,t.unit_price,t.tax_rate,t.tax_inclusive,t.subtotal,t.tax_amount,t.line_total
+ FROM jsonb_to_recordset(snapshots) AS t(product_id uuid,product_name text,quantity numeric,unit_price numeric,tax_rate numeric,tax_inclusive boolean,subtotal numeric,tax_amount numeric,line_total numeric);
  RETURN iid;
-END $function$;
-
-CREATE OR REPLACE FUNCTION public.edit_draft_invoice(p_invoice_id uuid, p_items jsonb)
- RETURNS uuid
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE i public.invoices%ROWTYPE;
-BEGIN
- IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
- SELECT * INTO i FROM public.invoices WHERE id=p_invoice_id AND user_id=auth.uid() FOR UPDATE;
- IF NOT FOUND THEN RAISE EXCEPTION 'Invoice not found or unauthorized' USING ERRCODE='42501'; END IF;
- IF i.status<>'draft' THEN RAISE EXCEPTION 'Only draft invoices can be edited'; END IF;
- PERFORM public.replace_draft_items(i.id,p_items);
- RETURN i.id;
-END $function$;
-
-CREATE OR REPLACE FUNCTION public.approve_invoice(p_invoice_id uuid)
- RETURNS text
- LANGUAGE plpgsql
- SECURITY DEFINER
- SET search_path TO ''
-AS $function$
-DECLARE i public.invoices%ROWTYPE; num text;
-BEGIN
- IF auth.uid() IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
- SELECT * INTO i FROM public.invoices WHERE id=p_invoice_id AND user_id=auth.uid() FOR UPDATE;
- IF NOT FOUND THEN RAISE EXCEPTION 'Invoice not found or unauthorized' USING ERRCODE='42501'; END IF;
- IF i.status<>'draft' THEN RAISE EXCEPTION 'Only draft invoices can be approved'; END IF;
- IF NOT EXISTS(SELECT 1 FROM public.invoice_items WHERE invoice_id=i.id) THEN RAISE EXCEPTION 'At least one item required'; END IF;
- PERFORM public.recalculate_invoice_totals(i.id);
- num := 'INV-' || nextval('public.invoice_number_seq'::regclass)::text;
- UPDATE public.invoices SET status='approved',approved_at=clock_timestamp(),invoice_number=num WHERE id=i.id;
- RETURN num;
 END $function$;
 
 CREATE OR REPLACE FUNCTION public.cancel_invoice(p_invoice_id uuid, p_reason text DEFAULT NULL::text)
@@ -192,13 +121,11 @@ CREATE OR REPLACE FUNCTION public.guard_invoice_history()
 AS $function$
 BEGIN
  IF TG_OP='DELETE' THEN
- IF OLD.status<>'draft' THEN RAISE EXCEPTION 'Finalized invoices cannot be deleted'; END IF; RETURN OLD;
+ RAISE EXCEPTION 'Finalized invoices cannot be deleted';
  END IF;
  IF NEW.id<>OLD.id OR NEW.user_id<>OLD.user_id OR NEW.currency<>OLD.currency OR NEW.exchange_rate<>OLD.exchange_rate OR NEW.created_at<>OLD.created_at THEN RAISE EXCEPTION 'Invoice identity and currency snapshot are immutable'; END IF;
  IF OLD.status='cancelled' THEN RAISE EXCEPTION 'Cancelled invoices are immutable'; END IF;
- IF OLD.status='approved' THEN
- IF NEW.status<>'cancelled' OR (to_jsonb(NEW)-'status'-'cancelled_at'-'cancellation_reason'-'updated_at') IS DISTINCT FROM (to_jsonb(OLD)-'status'-'cancelled_at'-'cancellation_reason'-'updated_at') THEN RAISE EXCEPTION 'Approved financial data is immutable'; END IF;
- ELSIF NEW.status NOT IN ('draft','approved') THEN RAISE EXCEPTION 'Invalid transition'; END IF;
+ IF OLD.status<>'approved' OR NEW.status<>'cancelled' OR (to_jsonb(NEW)-'status'-'cancelled_at'-'cancellation_reason'-'updated_at') IS DISTINCT FROM (to_jsonb(OLD)-'status'-'cancelled_at'-'cancellation_reason'-'updated_at') THEN RAISE EXCEPTION 'Approved financial data is immutable'; END IF;
  RETURN NEW;
 END $function$;
 
@@ -207,13 +134,15 @@ CREATE OR REPLACE FUNCTION public.guard_invoice_item_history()
  LANGUAGE plpgsql
  SET search_path TO ''
 AS $function$
-DECLARE s text; iid uuid;
+DECLARE invoice_status text;
 BEGIN
- IF TG_OP='UPDATE' AND NEW.invoice_id<>OLD.invoice_id THEN RAISE EXCEPTION 'Cannot move invoice items'; END IF;
- IF TG_OP='DELETE' THEN iid:=OLD.invoice_id; ELSE iid:=NEW.invoice_id; END IF;
- SELECT status INTO s FROM public.invoices WHERE id=iid FOR UPDATE;
- IF s IS DISTINCT FROM 'draft' THEN RAISE EXCEPTION 'Only draft invoice items may change'; END IF;
- IF TG_OP='DELETE' THEN RETURN OLD; END IF; RETURN NEW;
+ IF TG_OP<>'INSERT' THEN RAISE EXCEPTION 'Finalized invoice items are immutable'; END IF;
+ SELECT status INTO invoice_status FROM public.invoices WHERE id=NEW.invoice_id FOR UPDATE;
+ -- INSERT is restricted to the owner-only creation function by table permissions.
+ IF NOT FOUND OR invoice_status<>'approved' THEN
+  RAISE EXCEPTION 'Items can only be inserted while creating an invoice';
+ END IF;
+ RETURN NEW;
 END $function$;
 
 CREATE TRIGGER guard_invoice_history BEFORE DELETE OR UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION guard_invoice_history();

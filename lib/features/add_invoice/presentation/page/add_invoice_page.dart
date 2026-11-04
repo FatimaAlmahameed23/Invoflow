@@ -1,25 +1,14 @@
-import 'dart:convert';
-import 'dart:math';
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:invoflow/features/add_invoice/domain/usecases/get_products_use_case.dart';
-import 'package:invoflow/features/add_invoice/domain/usecases/create_invoice_use_case.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:invoflow/features/add_invoice/presentation/cubit/add_invoice_cubit.dart';
 import 'package:invoflow/features/add_invoice/presentation/widgets/product_picker_sheet.dart';
 import 'barcode_scanner_page.dart';
 import 'package:invoflow/core/widgets/app_app_bar.dart';
 import 'package:invoflow/features/add_invoice/domain/entities/product.dart';
-import 'package:invoflow/features/invoice/domain/services/invoice_tax_calculator.dart';
 
 class AddInvoicePage extends StatefulWidget {
-  const AddInvoicePage({
-    super.key,
-    required this.getProducts,
-    required this.createInvoice,
-  });
-
-  final GetProductsUseCase getProducts;
-  final CreateInvoiceUseCase createInvoice;
+  const AddInvoicePage({super.key});
 
   @override
   State<AddInvoicePage> createState() => _AddInvoicePageState();
@@ -29,20 +18,12 @@ class _AddInvoicePageState extends State<AddInvoicePage> {
   static const _currencies = ['JOD', 'USD', 'EUR'];
   static const _purple = Color(0xFF92257E);
 
-  String _currency = 'JOD';
-  List<Product> _products = [];
   final Map<String, TextEditingController> _quantityControllers = {};
-  bool _isLoadingProducts = true;
-  bool _isSaving = false;
-  String? _errorMessage;
-  String? _pendingCreateSignature;
-  String? _pendingIdempotencyKey;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadProducts();
-  }
+  AddInvoiceCubit get _cubit => context.read<AddInvoiceCubit>();
+  String get _currency => _cubit.state.currency;
+  bool get _isSaving => _cubit.state.isSaving;
+  bool get _isLoadingProducts => _cubit.state.isLoadingProducts;
 
   @override
   void dispose() {
@@ -52,92 +33,17 @@ class _AddInvoicePageState extends State<AddInvoicePage> {
     super.dispose();
   }
 
-  Future<void> _loadProducts() async {
-    setState(() {
-      _isLoadingProducts = true;
-      _errorMessage = null;
-    });
-
-    try {
-      final products = await widget.getProducts(currency: _currency);
-      if (!mounted) return;
-      final productIds = products.map((product) => product.id).toSet();
-      for (final id in _quantityControllers.keys.toList()) {
-        if (!productIds.contains(id)) {
-          _quantityControllers.remove(id)?.dispose();
-        }
-      }
-      setState(() {
-        _products = products;
-        _isLoadingProducts = false;
-      });
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = error.toString();
-        _isLoadingProducts = false;
-      });
-    }
-  }
-
-  void _addProduct(Product product) {
-    final controller = _quantityControllers[product.id];
-    if (controller == null) {
-      _quantityControllers[product.id] = TextEditingController(text: '1');
-    } else {
-      final quantity = double.tryParse(controller.text) ?? 0;
-      controller.text = _formatQuantity(quantity + 1);
-    }
-    setState(() {});
-  }
-
-  String _formatQuantity(double quantity) {
-    return quantity == quantity.truncateToDouble()
-        ? quantity.toInt().toString()
-        : quantity.toString();
-  }
-
-  InvoiceTaxTotals get _invoiceTotals => InvoiceTaxCalculator.calculateInvoice(
-    _products
-        .map((product) {
-          final quantity = _quantityFor(product);
-          return InvoiceTaxLine(
-            unitPrice: product.unitPrice,
-            quantity: quantity,
-            taxRate: product.taxRate,
-            taxInclusive: product.taxInclusive,
-          );
-        })
-        .where((line) => line.quantity > 0),
-  );
-
-  bool get _hasInvoiceItems => _quantityControllers.values.any((controller) {
-    final quantity = double.tryParse(controller.text);
-    return quantity != null && quantity > 0;
-  });
-
-  double _quantityFor(Product product) {
-    return double.tryParse(_quantityControllers[product.id]?.text ?? '') ?? 0;
-  }
-
-  InvoiceTaxCalculation _calculateLine(Product product, double quantity) {
-    return InvoiceTaxCalculator.calculate(
-      unitPrice: product.unitPrice,
-      quantity: quantity,
-      taxRate: product.taxRate,
-      taxInclusive: product.taxInclusive,
-    );
-  }
-
   Future<void> _showProductPicker() async {
     final product = await showModalBottomSheet<Product>(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) =>
-          ProductPickerSheet(products: _products, currency: _currency),
+      builder: (context) => ProductPickerSheet(
+        products: _cubit.state.products,
+        currency: _currency,
+      ),
     );
-    if (product != null && mounted) _addProduct(product);
+    if (product != null && mounted) _cubit.addProduct(product);
   }
 
   Future<void> _scanBarcode() async {
@@ -146,92 +52,7 @@ class _AddInvoicePageState extends State<AddInvoicePage> {
     );
     if (barcode == null || !mounted) return;
 
-    Product? product;
-    for (final candidate in _products) {
-      if (candidate.barcode == barcode) {
-        product = candidate;
-        break;
-      }
-    }
-    if (product == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('No catalog product found for barcode $barcode.'),
-        ),
-      );
-      return;
-    }
-    _addProduct(product);
-  }
-
-  Future<void> _createInvoice() async {
-    final items = <Map<String, dynamic>>[];
-    for (final product in _products) {
-      final value = _quantityControllers[product.id]?.text.trim() ?? '';
-      if (value.isEmpty) continue;
-
-      final quantity = double.tryParse(value);
-      if (quantity == null ||
-          !quantity.isFinite ||
-          quantity <= 0 ||
-          quantity > 999999) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Enter a valid quantity for ${product.name}.'),
-          ),
-        );
-        return;
-      }
-
-      items.add({'product_id': product.id, 'quantity': quantity});
-    }
-
-    if (items.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Add at least one item to the invoice.')),
-      );
-      return;
-    }
-
-    final requestSignature = jsonEncode({
-      'currency': _currency,
-      'items': items,
-    });
-    if (_pendingCreateSignature != requestSignature ||
-        _pendingIdempotencyKey == null) {
-      _pendingCreateSignature = requestSignature;
-      _pendingIdempotencyKey = _newIdempotencyKey();
-    }
-
-    setState(() {
-      _isSaving = true;
-      _errorMessage = null;
-    });
-    try {
-      await widget.createInvoice(
-        currency: _currency,
-        items: items,
-        idempotencyKey: _pendingIdempotencyKey!,
-      );
-      if (!mounted) return;
-      _pendingCreateSignature = null;
-      _pendingIdempotencyKey = null;
-      if (mounted) Navigator.of(context).pop(true);
-    } catch (error) {
-      if (!mounted) return;
-      setState(() {
-        _errorMessage = error.toString();
-        _isSaving = false;
-      });
-    }
-  }
-
-  String _newIdempotencyKey() {
-    final random = Random.secure();
-    return List.generate(
-      16,
-      (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
-    ).join();
+    _cubit.addBarcode(barcode);
   }
 
   String _moneyCents(int cents) =>
@@ -239,178 +60,174 @@ class _AddInvoicePageState extends State<AddInvoicePage> {
 
   @override
   Widget build(BuildContext context) {
-    final invoiceTotals = _invoiceTotals;
-
-    return Scaffold(
-      backgroundColor: const Color(0xFFFCF8FB),
-      appBar: const AppAppBar(title: 'Create Invoice'),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
-        children: [
-          _sectionLabel('Currency'),
-          const SizedBox(height: 8),
-          DropdownButtonFormField<String>(
-            key: ValueKey(_currency),
-            value: _currency,
-            decoration: _fieldDecoration(),
-            items: _currencies
-                .map(
-                  (currency) =>
-                      DropdownMenuItem(value: currency, child: Text(currency)),
-                )
-                .toList(),
-            onChanged: _isSaving
-                ? null
-                : (currency) {
-                    if (currency == null) return;
-                    setState(() => _currency = currency);
-                    _loadProducts();
-                  },
-          ),
-          const SizedBox(height: 22),
-          _sectionLabel('Tax Mode'),
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5E9F2),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: const Row(
-              children: [
-                Icon(Icons.info_outline, color: _purple, size: 20),
-                SizedBox(width: 9),
-                Expanded(
-                  child: Text(
-                    'Tax is calculated using each product’s settings.',
-                    style: TextStyle(color: _purple, fontSize: 13),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 22),
-          Row(
+    return BlocConsumer<AddInvoiceCubit, AddInvoiceState>(
+      listener: (context, state) {
+        if (state.isCreated) {
+          Navigator.of(context).pop(true);
+        } else if (state.message != null) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text(state.message!)));
+        }
+      },
+      builder: (context, state) {
+        final invoiceTotals = state.totals;
+        return Scaffold(
+          backgroundColor: const Color(0xFFFCF8FB),
+          appBar: const AppAppBar(title: 'Create Invoice'),
+          body: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
-              Expanded(child: _sectionLabel('Items')),
-              IconButton(
-                tooltip: 'Scan barcode',
-                onPressed: _isSaving || _isLoadingProducts
-                    ? null
-                    : _scanBarcode,
-                icon: const Icon(
-                  Icons.document_scanner_outlined,
-                  color: _purple,
-                ),
-              ),
-            ],
-          ),
-          SizedBox(
-            height: 48,
-            child: ElevatedButton.icon(
-              onPressed: _isSaving || _isLoadingProducts
-                  ? null
-                  : _showProductPicker,
-              icon: const Icon(Icons.add),
-              label: const Text('Add Item'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFF5E9F2),
-                foregroundColor: _purple,
-                elevation: 0,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(14),
-                ),
-              ),
-            ),
-          ),
-          if (_isLoadingProducts)
-            const Padding(
-              padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator()),
-            ),
-          if (_errorMessage != null && _products.isEmpty) ...[
-            const SizedBox(height: 12),
-            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-            TextButton(
-              onPressed: _isLoadingProducts ? null : _loadProducts,
-              child: const Text('Try again'),
-            ),
-          ],
-          if (!_isLoadingProducts && _errorMessage == null && _products.isEmpty)
-            const Padding(
-              padding: EdgeInsets.symmetric(vertical: 18),
-              child: Text('No products are available in your catalog.'),
-            ),
-          for (final product in _products)
-            if (_quantityControllers.containsKey(product.id))
-              _buildInvoiceItem(product),
-          const SizedBox(height: 18),
-          _summaryRow('Subtotal', _moneyCents(invoiceTotals.subtotalCents)),
-          const SizedBox(height: 10),
-          _summaryRow('Tax', _moneyCents(invoiceTotals.taxCents)),
-          const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 13),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF5E9F2),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: _summaryRow(
-              'Total',
-              _moneyCents(invoiceTotals.totalCents),
-              emphasized: true,
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.only(top: 8),
-            child: Text(
-              'Preview rounds each item to 2 decimals. The backend rounds saved item and invoice totals to 3 decimals; small differences are possible, and saved backend totals are authoritative.',
-              style: TextStyle(color: Colors.black54, fontSize: 12),
-            ),
-          ),
-          if (_errorMessage != null && _products.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(_errorMessage!, style: const TextStyle(color: Colors.red)),
-          ],
-        ],
-      ),
-      bottomNavigationBar: SafeArea(
-        child: Container(
-          padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
-          decoration: const BoxDecoration(
-            color: Colors.white,
-            border: Border(top: BorderSide(color: Color(0xFFF0E5ED))),
-          ),
-          child: SizedBox(
-            height: 50,
-            child: ElevatedButton(
-              onPressed: _isSaving || _isLoadingProducts || !_hasInvoiceItems
-                  ? null
-                  : _createInvoice,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: _purple,
-                foregroundColor: Colors.white,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-              ),
-              child: _isSaving
-                  ? const SizedBox(
-                      height: 22,
-                      width: 22,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        color: Colors.white,
+              _sectionLabel('Currency'),
+              const SizedBox(height: 8),
+              DropdownButtonFormField<String>(
+                key: ValueKey(_currency),
+                value: _currency,
+                decoration: _fieldDecoration(),
+                items: _currencies
+                    .map(
+                      (currency) => DropdownMenuItem(
+                        value: currency,
+                        child: Text(currency),
                       ),
                     )
-                  : const Text(
-                      'Save',
-                      style: TextStyle(fontWeight: FontWeight.w600),
+                    .toList(),
+                onChanged: _isSaving
+                    ? null
+                    : (currency) {
+                        if (currency == null) return;
+                        _cubit.changeCurrency(currency);
+                      },
+              ),
+              const SizedBox(height: 22),
+              Row(
+                children: [
+                  Expanded(child: _sectionLabel('Items')),
+                  IconButton(
+                    tooltip: 'Scan barcode',
+                    onPressed: _isSaving || _isLoadingProducts
+                        ? null
+                        : _scanBarcode,
+                    icon: const Icon(
+                      Icons.document_scanner_outlined,
+                      color: _purple,
                     ),
+                  ),
+                ],
+              ),
+              SizedBox(
+                height: 48,
+                child: ElevatedButton.icon(
+                  onPressed: _isSaving || _isLoadingProducts
+                      ? null
+                      : _showProductPicker,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Item'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFFF5E9F2),
+                    foregroundColor: _purple,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                  ),
+                ),
+              ),
+              if (_isLoadingProducts)
+                const Padding(
+                  padding: EdgeInsets.all(24),
+                  child: Center(child: CircularProgressIndicator()),
+                ),
+              if (state.errorMessage != null && state.products.isEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  state.errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                TextButton(
+                  onPressed: _isLoadingProducts ? null : _cubit.loadProducts,
+                  child: const Text('Try again'),
+                ),
+              ],
+              if (!_isLoadingProducts &&
+                  state.errorMessage == null &&
+                  state.products.isEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 18),
+                  child: Text('No products are available in your catalog.'),
+                ),
+              for (final product in state.products)
+                if (state.quantities.containsKey(product.id))
+                  _buildInvoiceItem(product),
+              const SizedBox(height: 18),
+              _summaryRow('Subtotal', _moneyCents(invoiceTotals.subtotalCents)),
+              const SizedBox(height: 10),
+              _summaryRow('Tax', _moneyCents(invoiceTotals.taxCents)),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 13,
+                ),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5E9F2),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: _summaryRow(
+                  'Total',
+                  _moneyCents(invoiceTotals.totalCents),
+                  emphasized: true,
+                ),
+              ),
+              if (state.errorMessage != null && state.products.isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  state.errorMessage!,
+                  style: const TextStyle(color: Colors.red),
+                ),
+              ],
+            ],
+          ),
+          bottomNavigationBar: SafeArea(
+            child: Container(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 14),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                border: Border(top: BorderSide(color: Color(0xFFF0E5ED))),
+              ),
+              child: SizedBox(
+                height: 50,
+                child: ElevatedButton(
+                  onPressed:
+                      _isSaving || _isLoadingProducts || !state.hasInvoiceItems
+                      ? null
+                      : _cubit.saveInvoice,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _purple,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: _isSaving
+                      ? const SizedBox(
+                          height: 22,
+                          width: 22,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Save',
+                          style: TextStyle(fontWeight: FontWeight.w600),
+                        ),
+                ),
+              ),
             ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -436,11 +253,21 @@ class _AddInvoicePageState extends State<AddInvoicePage> {
   );
 
   Widget _buildInvoiceItem(Product product) {
-    final controller = _quantityControllers[product.id]!;
-    final quantity = double.tryParse(controller.text) ?? 0;
-    final line = _calculateLine(product, quantity);
+    final value = _cubit.state.quantities[product.id]!;
+    final controller = _quantityControllers.putIfAbsent(
+      product.id,
+      () => TextEditingController(text: value),
+    );
+    if (controller.text != value) {
+      controller.value = TextEditingValue(
+        text: value,
+        selection: TextSelection.collapsed(offset: value.length),
+      );
+    }
+    final line = _cubit.state.lineFor(product);
 
     return Container(
+      key: ValueKey(product.id),
       margin: const EdgeInsets.only(top: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
@@ -467,10 +294,7 @@ class _AddInvoicePageState extends State<AddInvoicePage> {
                 visualDensity: VisualDensity.compact,
                 onPressed: _isSaving
                     ? null
-                    : () {
-                        _quantityControllers.remove(product.id)?.dispose();
-                        setState(() {});
-                      },
+                    : () => _cubit.removeProduct(product.id),
                 icon: const Icon(Icons.close, size: 19),
               ),
             ],
@@ -497,7 +321,8 @@ class _AddInvoicePageState extends State<AddInvoicePage> {
                       RegExp(r'^\d*\.?\d{0,3}'),
                     ),
                   ],
-                  onChanged: (_) => setState(() {}),
+                  onChanged: (value) =>
+                      _cubit.updateQuantity(product.id, value),
                   decoration: _fieldDecoration().copyWith(
                     labelText: 'Quantity',
                     isDense: true,

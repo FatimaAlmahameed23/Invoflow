@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:invoflow/core/network/api_exception.dart';
-import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
 import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
 import 'package:invoflow/features/invoice/domain/entities/invoice.dart';
 import 'package:invoflow/features/invoice/domain/repositories/invoice_repository.dart';
@@ -95,7 +94,7 @@ class _FakeInvoiceRepository implements InvoiceRepository {
     message: 'Conflict',
   );
 
-  final InvoiceModel _approvedInvoice = const InvoiceModel(
+  final Invoice _approvedInvoice = const Invoice(
     id: 'invoice-1',
     invoiceNumber: 'INV-0001',
     status: InvoiceStatus.approved,
@@ -121,7 +120,7 @@ class _FakeInvoiceRepository implements InvoiceRepository {
       throw failure;
     }
 
-    return InvoiceModel(
+    return Invoice(
       id: _approvedInvoice.id,
       invoiceNumber: _approvedInvoice.invoiceNumber,
       status: InvoiceStatus.deleted,

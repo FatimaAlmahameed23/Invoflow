@@ -1,7 +1,6 @@
 import 'package:invoflow/core/network/api_client.dart';
 import 'package:invoflow/features/add_invoice/data/models/product_model.dart';
 import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
-import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
 
 class AddInvoiceRemoteDataSource {
   const AddInvoiceRemoteDataSource(this._apiClient);
@@ -34,12 +33,6 @@ class AddInvoiceRemoteDataSource {
     final invoice = InvoiceModel.fromJson(
       Map<String, dynamic>.from(response['data'] as Map),
     );
-
-    if (invoice.status != InvoiceStatus.approved) {
-      throw const FormatException(
-        'The API created an invoice with an unexpected status.',
-      );
-    }
 
     return invoice;
   }

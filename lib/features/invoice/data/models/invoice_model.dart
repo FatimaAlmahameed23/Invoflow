@@ -1,17 +1,23 @@
-import 'package:invoflow/features/invoice/domain/entities/invoice.dart';
-import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
-
-class InvoiceModel extends Invoice {
+class InvoiceModel {
   const InvoiceModel({
-    required super.id,
-    required super.invoiceNumber,
-    required super.status,
-    required super.currency,
-    required super.subtotal,
-    required super.taxTotal,
-    required super.grandTotal,
-    required super.createdAt,
+    required this.id,
+    required this.invoiceNumber,
+    required this.status,
+    required this.currency,
+    required this.subtotal,
+    required this.taxTotal,
+    required this.grandTotal,
+    required this.createdAt,
   });
+
+  final String id;
+  final String? invoiceNumber;
+  final String status;
+  final String currency;
+  final num subtotal;
+  final num taxTotal;
+  final num grandTotal;
+  final String? createdAt;
 
   factory InvoiceModel.fromJson(Map<String, dynamic> json) {
     final id = json['id'];
@@ -37,12 +43,12 @@ class InvoiceModel extends Invoice {
     return InvoiceModel(
       id: id,
       invoiceNumber: invoiceNumber as String?,
-      status: InvoiceStatus.fromApi(status),
+      status: status,
       currency: currency,
-      subtotal: subtotal.toDouble(),
-      taxTotal: taxTotal.toDouble(),
-      grandTotal: grandTotal.toDouble(),
-      createdAt: createdAt == null ? null : DateTime.tryParse(createdAt),
+      subtotal: subtotal,
+      taxTotal: taxTotal,
+      grandTotal: grandTotal,
+      createdAt: createdAt as String?,
     );
   }
 }
