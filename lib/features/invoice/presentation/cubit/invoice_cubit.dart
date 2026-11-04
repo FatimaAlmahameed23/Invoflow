@@ -5,7 +5,9 @@ import 'package:invoflow/core/network/api_exception.dart';
 import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
 import 'package:invoflow/features/invoice/domain/usecases/delete_invoice_use_case.dart';
 import 'package:invoflow/features/invoice/domain/usecases/get_invoices_use_case.dart';
-import 'package:invoflow/features/invoice/presentation/cubit/invoice_state.dart';
+import 'package:invoflow/features/invoice/domain/entities/invoice.dart';
+
+part 'invoice_state.dart';
 
 class InvoiceCubit extends Cubit<InvoiceState> {
   InvoiceCubit({

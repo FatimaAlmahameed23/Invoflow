@@ -1,6 +1,5 @@
 import 'package:invoflow/core/network/api_client.dart';
 import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
-import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
 
 class InvoiceRemoteDataSource {
   const InvoiceRemoteDataSource(this._apiClient);
@@ -38,12 +37,6 @@ class InvoiceRemoteDataSource {
     final invoice = InvoiceModel.fromJson(
       Map<String, dynamic>.from(response['data'] as Map),
     );
-    if (invoice.status != InvoiceStatus.deleted) {
-      throw const FormatException(
-        'The API did not mark the invoice as deleted.',
-      );
-    }
-
     return invoice;
   }
 

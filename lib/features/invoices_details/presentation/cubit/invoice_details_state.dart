@@ -1,4 +1,4 @@
-import 'package:invoflow/features/invoices_details/domain/entities/invoice_details.dart';
+part of 'invoice_details_cubit.dart';
 
 class InvoiceDetailsState {
   const InvoiceDetailsState({

@@ -27,7 +27,7 @@ CREATE TABLE public."invoices" (
   "id" uuid DEFAULT gen_random_uuid() NOT NULL,
   "user_id" uuid NOT NULL,
   "invoice_number" text,
-  "status" text DEFAULT 'draft'::text NOT NULL,
+  "status" text DEFAULT 'approved'::text NOT NULL,
   "currency" character varying(3) DEFAULT 'JOD'::character varying NOT NULL,
   "exchange_rate" numeric(18,6) DEFAULT 1 NOT NULL,
   "subtotal" numeric(18,3) DEFAULT 0 NOT NULL,
@@ -73,7 +73,7 @@ ALTER TABLE public."invoice_items" ADD CONSTRAINT "invoice_items_tax_rate_check"
 
 ALTER TABLE public."invoice_items" ADD CONSTRAINT "invoice_items_unit_price_check" CHECK ((unit_price >= (0)::numeric));
 
-ALTER TABLE public."invoices" ADD CONSTRAINT "invoice_lifecycle" CHECK ((((status = 'draft'::text) AND (invoice_number IS NULL) AND (approved_at IS NULL) AND (cancelled_at IS NULL) AND (cancellation_reason IS NULL)) OR ((status = 'approved'::text) AND (invoice_number IS NOT NULL) AND (approved_at IS NOT NULL) AND (cancelled_at IS NULL) AND (cancellation_reason IS NULL)) OR ((status = 'cancelled'::text) AND (invoice_number IS NOT NULL) AND (approved_at IS NOT NULL) AND (cancelled_at IS NOT NULL))));
+ALTER TABLE public."invoices" ADD CONSTRAINT "invoice_lifecycle" CHECK ((((status = 'approved'::text) AND (invoice_number IS NOT NULL) AND (approved_at IS NOT NULL) AND (cancelled_at IS NULL) AND (cancellation_reason IS NULL)) OR ((status = 'cancelled'::text) AND (invoice_number IS NOT NULL) AND (approved_at IS NOT NULL) AND (cancelled_at IS NOT NULL))));
 
 ALTER TABLE public."invoices" ADD CONSTRAINT "invoice_rate_finite" CHECK (((exchange_rate < (1000000)::numeric) AND (((currency)::text <> 'JOD'::text) OR (exchange_rate = (1)::numeric))));
 
@@ -89,7 +89,7 @@ ALTER TABLE public."invoices" ADD CONSTRAINT "invoices_invoice_number_key" UNIQU
 
 ALTER TABLE public."invoices" ADD CONSTRAINT "invoices_pkey" PRIMARY KEY (id);
 
-ALTER TABLE public."invoices" ADD CONSTRAINT "invoices_status_check" CHECK ((status = ANY (ARRAY['draft'::text, 'approved'::text, 'cancelled'::text])));
+ALTER TABLE public."invoices" ADD CONSTRAINT "invoices_status_check" CHECK ((status = ANY (ARRAY['approved'::text, 'cancelled'::text])));
 
 ALTER TABLE public."invoices" ADD CONSTRAINT "invoices_subtotal_check" CHECK ((subtotal >= (0)::numeric));
 

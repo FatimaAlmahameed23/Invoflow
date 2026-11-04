@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:invoflow/features/invoice/domain/entities/invoice.dart';
-import 'package:invoflow/features/invoice/widgets/status_badge.dart';
+import 'package:invoflow/features/invoice/presentation/widgets/status_badge.dart';
 
 class InvoiceCard extends StatefulWidget {
   const InvoiceCard({
@@ -111,7 +111,7 @@ class _InvoiceCardState extends State<InvoiceCard> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          widget.invoice.invoiceNumber ?? 'Draft invoice',
+                          widget.invoice.invoiceNumber ?? 'Invoice',
                           style: const TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w700,

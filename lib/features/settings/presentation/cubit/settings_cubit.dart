@@ -5,21 +5,7 @@ import '../../domain/entities/settings_user.dart';
 import '../../domain/usecases/get_current_user_use_case.dart';
 import '../../domain/usecases/sign_out_use_case.dart';
 
-class SettingsState {
-  final SettingsUser? user;
-  final bool isLoading;
-  final bool isSigningOut;
-  final bool isSignedOut;
-  final String? errorMessage;
-
-  const SettingsState({
-    this.user,
-    this.isLoading = false,
-    this.isSigningOut = false,
-    this.isSignedOut = false,
-    this.errorMessage,
-  });
-}
+part 'settings_state.dart';
 
 class SettingsCubit extends Cubit<SettingsState> {
   final GetCurrentUserUseCase getCurrentUser;

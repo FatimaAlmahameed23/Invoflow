@@ -11,7 +11,7 @@ GRANT INSERT(usd_rate_source,usd_rate_effective_on,eur_rate_source,eur_rate_effe
 CREATE TABLE public.invoice_api_requests (
  user_id uuid NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
  request_key text NOT NULL CHECK(length(request_key) BETWEEN 8 AND 128),
- operation text NOT NULL CHECK(operation IN ('create','edit','approve','cancel')),
+ operation text NOT NULL CHECK(operation IN ('create','cancel')),
  payload jsonb NOT NULL,
  result jsonb,
  created_at timestamptz NOT NULL DEFAULT now(),
@@ -25,10 +25,8 @@ DECLARE uid uuid:=auth.uid(); previous public.invoice_api_requests%ROWTYPE; iid 
 BEGIN
  IF uid IS NULL THEN RAISE EXCEPTION 'Authentication required' USING ERRCODE='42501'; END IF;
  IF p_key IS NULL OR p_key !~ '^[A-Za-z0-9._:-]{8,128}$' THEN RAISE EXCEPTION 'Invalid idempotency key' USING ERRCODE='22023'; END IF;
- IF p_operation IS NULL OR p_operation NOT IN ('create','edit','approve','cancel') OR jsonb_typeof(p_payload) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'Invalid operation payload' USING ERRCODE='22023'; END IF;
+ IF p_operation IS NULL OR p_operation NOT IN ('create','cancel') OR jsonb_typeof(p_payload) IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'Invalid operation payload' USING ERRCODE='22023'; END IF;
  IF (p_operation='create' AND (p_payload-'currency'-'items')<>'{}'::jsonb)
- OR (p_operation='edit' AND (p_payload-'invoice_id'-'items')<>'{}'::jsonb)
- OR (p_operation='approve' AND (p_payload-'invoice_id')<>'{}'::jsonb)
  OR (p_operation='cancel' AND (p_payload-'invoice_id'-'reason')<>'{}'::jsonb)
  THEN RAISE EXCEPTION 'Unexpected payload fields' USING ERRCODE='22023'; END IF;
  INSERT INTO public.invoice_api_requests(user_id,request_key,operation,payload)
@@ -37,14 +35,10 @@ BEGIN
  IF previous.operation<>p_operation OR previous.payload<>p_payload THEN RAISE EXCEPTION 'Idempotency key reused with different request' USING ERRCODE='23505'; END IF;
  IF previous.result IS NOT NULL THEN RETURN jsonb_build_object('invoice',previous.result,'replayed',true); END IF;
  IF p_operation='create' THEN
-  iid:=public.create_draft_invoice((p_payload->>'currency')::varchar,p_payload->'items');
+  iid:=public.create_invoice((p_payload->>'currency')::varchar,p_payload->'items');
  ELSE
   iid:=(p_payload->>'invoice_id')::uuid;
-  CASE p_operation
-   WHEN 'edit' THEN PERFORM public.edit_draft_invoice(iid,p_payload->'items');
-   WHEN 'approve' THEN PERFORM public.approve_invoice(iid);
-   WHEN 'cancel' THEN PERFORM public.cancel_invoice(iid,p_payload->>'reason');
-  END CASE;
+  PERFORM public.cancel_invoice(iid,p_payload->>'reason');
  END IF;
  SELECT to_jsonb(i)||jsonb_build_object('items',coalesce((SELECT jsonb_agg(to_jsonb(x) ORDER BY x.created_at,x.id) FROM public.invoice_items x WHERE x.invoice_id=i.id),'[]'::jsonb)) INTO response
  FROM public.invoices i WHERE id=iid AND user_id=uid;

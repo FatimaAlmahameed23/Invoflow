@@ -1,6 +1,8 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:invoflow/features/invoices_details/domain/usecases/get_invoice_details_use_case.dart';
-import 'package:invoflow/features/invoices_details/presentation/cubit/invoice_details_state.dart';
+import 'package:invoflow/features/invoices_details/domain/entities/invoice_details.dart';
+
+part 'invoice_details_state.dart';
 
 class InvoiceDetailsCubit extends Cubit<InvoiceDetailsState> {
   InvoiceDetailsCubit(this._getInvoiceDetails)

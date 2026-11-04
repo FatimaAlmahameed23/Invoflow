@@ -6,7 +6,6 @@ import 'package:invoflow/features/invoices_details/data/datasources/invoice_deta
 import 'package:invoflow/features/invoices_details/data/repositories/invoice_details_repository_impl.dart';
 import 'package:invoflow/features/invoices_details/domain/usecases/get_invoice_details_use_case.dart';
 import 'package:invoflow/features/invoices_details/presentation/cubit/invoice_details_cubit.dart';
-import 'package:invoflow/features/invoices_details/presentation/cubit/invoice_details_state.dart';
 import 'package:invoflow/features/invoices_details/presentation/widgets/invoice_details_information.dart';
 import 'package:invoflow/features/invoices_details/presentation/widgets/invoice_details_items.dart';
 import 'package:invoflow/features/invoices_details/presentation/widgets/invoice_details_totals.dart';

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:invoflow/features/invoices_details/domain/entities/invoice_details.dart';
-import 'package:invoflow/features/invoice/widgets/status_badge.dart';
+import 'package:invoflow/features/invoice/presentation/widgets/status_badge.dart';
 
 class InvoiceDetailsInformation extends StatelessWidget {
   const InvoiceDetailsInformation({super.key, required this.invoice});
@@ -58,7 +58,6 @@ class InvoiceDetailsInformation extends StatelessWidget {
           ),
           _InfoRow(label: 'Date', value: _formattedDate),
           _InfoRow(label: 'Currency', value: invoice.currency),
-          _InfoRow(label: 'Tax Mode', value: invoice.taxMode),
         ],
       ),
     );

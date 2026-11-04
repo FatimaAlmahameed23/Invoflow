@@ -1,6 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:invoflow/features/invoice/data/models/invoice_model.dart';
-import 'package:invoflow/features/invoice/domain/enum/status_enum.dart';
 import 'package:invoflow/features/invoice/domain/services/invoice_tax_calculator.dart';
 
 void main() {
@@ -120,7 +119,7 @@ void main() {
     final invoice = InvoiceModel.fromJson({
       'id': 'invoice-id',
       'invoice_number': 'INV-0001',
-      'status': 'draft',
+      'status': 'approved',
       'currency': 'JOD',
       'subtotal': 100.123,
       'tax_total': 16.02,
@@ -128,12 +127,13 @@ void main() {
       'created_at': '2025-01-28T12:00:00Z',
     });
 
+    expect(invoice.createdAt, '2025-01-28T12:00:00Z');
     expect(invoice.subtotal, 100.123);
     expect(invoice.taxTotal, 16.02);
     expect(invoice.grandTotal, 116.143);
   });
 
-  test('InvoiceModel parses the updated invoice statuses', () {
+  test('InvoiceModel preserves backend status strings', () {
     final approvedInvoice = InvoiceModel.fromJson({
       'id': 'approved-id',
       'invoice_number': 'INV-0002',
@@ -153,7 +153,7 @@ void main() {
       'grand_total': 116,
     });
 
-    expect(approvedInvoice.status, InvoiceStatus.approved);
-    expect(deletedInvoice.status, InvoiceStatus.deleted);
+    expect(approvedInvoice.status, 'approved');
+    expect(deletedInvoice.status, 'deleted');
   });
 }
